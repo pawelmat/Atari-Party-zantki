@@ -12,7 +12,7 @@ scr		= $5000
 charset	= $e000+32*8
 width	= 32		; narrow playfield
 heigth	= 32
-//heigth	= 56
+////heigth	= 56
 sync	= 20
 
 seccnt	= $90

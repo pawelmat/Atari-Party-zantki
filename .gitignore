@@ -1,3 +1,8 @@
-partyzantki.lab
-partyzantki.lst
-partyzantki.xex
+atasm-build.json
+*.atdbg
+*.brk
+*.lab
+*.lst
+*.xex
+bookmarks.json
+

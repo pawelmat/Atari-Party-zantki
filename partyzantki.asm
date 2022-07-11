@@ -11,15 +11,11 @@ start 	= $4000
 scr		= $5000
 charset	= $e000+32*8
 width	= 32		; narrow playfield
-heigth	= 32
-////heigth	= 56
+heigth	= 56
 sync	= 20
 
 seccnt	= $90
-letter	= $91
-t1		= $92
-stab    = $98
-
+temp1	= $91
 
 	icl "Includes/registers.asm"
 	icl "Includes/zeropage.asm"
@@ -27,14 +23,10 @@ stab    = $98
 	org	start
 
 	// create display list
-	
 	ldx	#heigth+>scr-1
 dlcreate
-	ldy #3
-dlc1
 	jsr	dl_elem_add
-	dey
-	bpl dlc1
+	jsr	dl_elem_add
 	dex
 	cpx #>scr
 	bpl	dlcreate
@@ -45,48 +37,37 @@ dlc1
 	lda #$40
 	sta	SDLSTH
 	sta GPRIOR
-
-	ldx	#32
-	ldy	#29		;27, 29, 30
-	sty seccnt
-ct1
-	sty stab,x
-	adc	#224	;192, 224, 240
-	bcc	ct2
-	dey
-ct2
-	dex
-	bne	ct1
+	sta RTCLOKM
+	sta RTCLOKL
 
 	// main loop
 mainloop
-
-	ldx	#4
-syncloop
-	dec	seccnt
-	lda	seccnt
-	and	#$f
+	ldy	#sync
 vsync
-	cmp	VCOUNT
+	cpy	VCOUNT
 	bne	vsync
-	dex
-	bne	syncloop
 
-	lda	seccnt
-	bpl	zoomer
-	lda	#30
+	lda RTCLOKM		; move increment time counter approx every second
+	and	#$0f
 	sta seccnt
+	inc	RTCLOKL		; speed up clock ticks
 
-	ldx	letter
+	ldx	#0
+eventcheck
+	lda text,x		; valid time: from
+	inx
+	cmp	seccnt		; A-mem
+	bpl	e1
+	lda text,x		; valid time: to
+	inx
+	cmp	seccnt
+	bmi	e2
+	
+	// print char
 	lda text,x		;color, column
 	inx
 	ldy	text,x		; char
-	inx
-	cpx	#textend-text
-	bne	nowrap
-	ldx	#0
-nowrap	
-	stx	letter
+	stx	temp1
 	
 	sty	printline+1
 	tay
@@ -96,7 +77,7 @@ nowrap
 	tya
 	and #$f0
 	sta COLOR4
-	lda	#>scr+heigth/2-4
+	lda	#>scr
 	sta	scrptr1+1
 
 printchar
@@ -118,51 +99,54 @@ nodot
 	inc scrptr1+1
 	dey
 	bpl printline
-	bmi	mainloop
+	
+	ldx temp1
+	bne	e3
+e1	inx
+e2	inx
+e3	inx
+	cpx	#textend-text
+	bmi	eventcheck
 
-	.proc zoomer
-	lda #>scr
-	sta ptarget1+2
-	lda	#heigth-1
-	sta t1
-pcollumn
-	ldx t1
-	lda stab,x
-	adc #>scr
-	tax
-	stx	psource1+2
-	stx	psource2+2
-	inx
-	stx	psource3+2
-	dex
-	dex
-	stx	psource4+2
-	ldx	#width-1
-pline					; print one pixel line
-	ldy stab,x
-psource1
-	lda	scr,y
+	.proc fire		; overlay the fire effect on the screen
+	ldy	#heigth+>scr-1
+fire1
+	sty f1+2
+	sty f5+2
 	iny
-psource2
-	adc	scr,y
+	sty f6+2
 	dey
-psource3
-	adc	scr,y
-	iny
-psource4
-	adc	scr,y
-	lsr
-	lsr
-ptarget1
-	sta scr,x
+	dey
+	sty f2+2
+	sty f3+2
+	sty f4+2
+	ldx #width-2
+fire2				; average of 4 neighbours
+f1	lda	scr,x
+	inx
+f2	adc scr+$100,x
 	dex
-	bpl pline
+f3	adc scr+$100,x
+	dex
+f4	adc scr+$100,x
+	lsr
+	lsr
 
-	inc ptarget1+2			; move screen to next line
+	inx
+f5	sta	scr,x
 
-	dec t1
-	bne pcollumn
-	.endp
+;	bit RTCLOKL
+;	beq	f7
+	bit RANDOM
+	bpl	f7
+;	bne	f7
+f6	sta	scr,x
+f7
+	dex
+	bne	fire2
+	cpy #>scr
+	bne	fire1
+	.endp			; end of fire
 	
 	jmp mainloop
 
@@ -171,7 +155,7 @@ dl_elem_add
 	lda	#$4f
 	jsr	s1
 	txa
-
+		
 s1	sta dl1			; for this to work, "dl" must start on an even address
 	inc s1+1
 	bne s2
@@ -181,21 +165,18 @@ s2
 	rts
 
 text
-	.byte $16, ["S"-32]*8, $36, ["U"-32]*8
-	.byte $55, ["S"-32]*8, $A7, ["P"-32]*8, $94, ["E"-32]*8
-	.byte $26, ["C"-32]*8, $B7, ["T"-32]*8
+	.byte $00, $03, $13, ["S"-32]*8, $01, $04, $19, ["V"-32]*8
+	.byte $05, $0A, $52, ["R"-32]*8, $06, $0B, $AA, ["Z"-32]*8, $07, $0C, $96, ["L"-32]*8, $0C, $0E, $06, [63-32]*8
 textend
-	.byte 0
-	
-;	.align 2
-dl	.byte 	$70		; has to be aligned to even address
+
+dl	.byte 	$70
+;	.align 2,0
 dl1
 	;.byte	$4F, a(scr), 0, $4F, a(scr), 0, $41, a(dl)
-	;.byte	$4F, 0, a(scr), 0, ... $41, a(dl)
 	
-	//org	dl1+[2*4*heigth]
-	org	dl1+[4*4*heigth]
+	org	dl1+[2*4*heigth]
 	
 dl2	.byte	$41, a(dl)
 ;	.byte $4B, $41, $4E, $45
+
 	

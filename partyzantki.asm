@@ -7,10 +7,12 @@
 ; Silly Venture 2022 Atari 256-bytes compo entry
 ; *********************************************
 
-start 	= $4000
+start 	= $4000		; do not change as the DL list is assumed to be in $40H
+buf		= $4400
 scr		= $5000
 charset	= $e000+32*8
-width	= 32		; narrow playfield
+;width	= 32		; narrow playfield
+width	= 40
 heigth	= 56
 sync	= 20
 
@@ -22,8 +24,7 @@ temp1	= $91
 
 	org	start
 
-	// create display list
-	ldx	#heigth+>scr-1
+	ldx	#heigth+>scr-1	; create display list
 dlcreate
 	jsr	dl_elem_add
 	jsr	dl_elem_add
@@ -31,7 +32,7 @@ dlcreate
 	cpx #>scr
 	bpl	dlcreate
 	
-	dec	SDMCTL		; $21 = narrow playfield
+;	dec	SDMCTL		; $21 = narrow playfield
 	lda	#<dl
 	sta	SDLSTL
 	lda #$40
@@ -47,110 +48,65 @@ vsync
 	cpy	VCOUNT
 	bne	vsync
 
-	lda RTCLOKM		; move increment time counter approx every second
-	and	#$0f
-	sta seccnt
-	inc	RTCLOKL		; speed up clock ticks
+	lda	t1
+	sta	pathLoop+1	; move buffer every frame
+	adc	#width+30
+	sta	bufVal+1 	; move buffer every frame
+	inc	t1
 
-	ldx	#0
-eventcheck
-	lda text,x		; valid time: from
-	inx
-	cmp	seccnt		; A-mem
-	bpl	e1
-	lda text,x		; valid time: to
-	inx
-	cmp	seccnt
-	bmi	e2
-	
-	// print char
-	lda text,x		;color, column
-	inx
-	ldy	text,x		; char
-	stx	temp1
-	
-	sty	printline+1
-	tay
-	and	#$0f
-	asl
-	sta scrptr1
-	tya
-	and #$f0
-	sta COLOR4
-	lda	#>scr
-	sta	scrptr1+1
+	lda	t3
+	cmp	t4
+	bne	noYUpdate
 
-printchar
-	ldy #7
-printline			; print one font pixel line
-	lda	charset,y
-	ldx	#7
-printdot			; print single font "pixel"
-	lsr
-	bcc	nodot
-	pha
+	lda	RANDOM		; get new Y value
+	and	#31
+	sta	t3			; t3 = target Y
+noYUpdate:
+	bit	RANDOM
+	bpl	yCont
+
+	lda	t3			; tend t4 towards t3
+	cmp	t4
+	bmi	yLower
+	inc	t4
+	jmp	yCont
+yLower:
+	dec	t4
+
+yCont:
+	lda	t4
+bufVal:
+	sta	buf
+
+
+
+	ldx	#255
+pathLoop:
+	lda	buf
+
+	clc
+	adc	#>scr
+	sta	pathSet1+2
+	sta	pathSet2+2
+
 	lda	#$ff
-scrptr1 = *+1
-	sta scr,x
-	pla
-nodot
-	dex
-	bpl printdot
-	inc scrptr1+1
-	dey
-	bpl printline
-	
-	ldx temp1
-	bne	e3
-e1	inx
-e2	inx
-e3	inx
-	cpx	#textend-text
-	bmi	eventcheck
-
-	.proc fire		; overlay the fire effect on the screen
-	ldy	#heigth+>scr-1
-fire1
-	sty f1+2
-	sty f5+2
-	iny
-	sty f6+2
-	dey
-	dey
-	sty f2+2
-	sty f3+2
-	sty f4+2
-	ldx #width-2
-fire2				; average of 4 neighbours
-f1	lda	scr,x
-	inx
-f2	adc scr+$100,x
-	dex
-f3	adc scr+$100,x
-	dex
-f4	adc scr+$100,x
-	lsr
-	lsr
+pathSet2:
+	sta	scr,x
 
 	inx
-f5	sta	scr,x
+	lda	#0
+pathSet1:
+	sta	scr,x
 
-;	bit RTCLOKL
-;	beq	f7
-	bit RANDOM
-	bpl	f7
-;	bne	f7
-f6	sta	scr,x
-f7
-	dex
-	bne	fire2
-	cpy #>scr
-	bne	fire1
-	.endp			; end of fire
-	
+	inc	pathLoop+1	; progress buffer
+
+	cpx	#width
+	bne	pathLoop
+
+
 	jmp mainloop
 
-// add Display List element - one mode 15 line and one blank line
+; add Display List element - one mode 15 line and one blank line
 dl_elem_add
 	lda	#$4f
 	jsr	s1
@@ -164,19 +120,21 @@ s2
 	inc s1+1
 	rts
 
-text
-	.byte $00, $03, $13, ["S"-32]*8, $01, $04, $19, ["V"-32]*8
-	.byte $05, $0A, $52, ["R"-32]*8, $06, $0B, $AA, ["Z"-32]*8, $07, $0C, $96, ["L"-32]*8, $0C, $0E, $06, [63-32]*8
-textend
-
+	.align 2,0			; TBD - remove
+	;.byte	$70, $4F, a(scr), 0, $4F, a(scr), 0, $41, a(dl)
 dl	.byte 	$70
-;	.align 2,0
 dl1
-	;.byte	$4F, a(scr), 0, $4F, a(scr), 0, $41, a(dl)
-	
+
+endmain1
+
 	org	dl1+[2*4*heigth]
 	
 dl2	.byte	$41, a(dl)
-;	.byte $4B, $41, $4E, $45
 
+endmain2
+
+	.print	"----------------------------"
+	.print	"Start: ", start, " DL: ", endmain1, " End: ", endmain2, " (Len: ", endmain1-start+endmain2-dl2, ")"
+	.print	"File:  ", endmain1-start+endmain2-dl2+10
+	.print	"----------------------------"
 	

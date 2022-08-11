@@ -1,5 +1,5 @@
 ; *******************************************
-; Register definitions
+; Registers and key memory locations
 ; Kane / Suspect
 ; Copyright (C) 2021-2022 Pawel Matusz. Distributed under the terms of the GNU GPL-3.0.
 ; *******************************************
@@ -45,6 +45,19 @@ PRIOR	=	$D01B
 GRACTL	=	$D01D	; Graphics Control
 
 RANDOM	=	$D20A
+
+AUDF1   =   $D200   ; frequency
+AUDC1   =   $D201   ; volume (0-15) and distortion
+AUDF2   =   $D202
+AUDC2   =   $D203
+AUDF3   =   $D204
+AUDC3   =   $D205
+AUDF4   =   $D206
+AUDC4   =   $D207
+AUDCTL  =   $D208
+
+IRQEN   =   $D20E
+SKCTL   =   $D20F
 
 RTCLOKH	=	$12
 RTCLOKM	=	$13

@@ -11,11 +11,11 @@ It can be assembled using MADS and has been written using the Atari Atasm plugin
 
 **Required HW:**       Stock Atari 65XE, 800XL or 130XE or equivalent
 
-**Party:**             Silly Venture 2022, Gdansk, Poland
+**Party:**             Silly Venture 2022 Summer Edition, Gdansk, Poland
 
 **Compo:**             Atari XL/XE, Intro 256B
 
-**Place:**             #TBD
+**Place:**             3rd
 
 
 ## Links
